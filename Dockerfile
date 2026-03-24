@@ -1,29 +1,26 @@
-FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04
+FROM runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04
 
 WORKDIR /app
 
-# Install Python 3.11
-RUN apt-get update && apt-get install -y python3.11 python3.11-venv python3-pip && \
-    ln -sf /usr/bin/python3.11 /usr/bin/python && \
-    rm -rf /var/lib/apt/lists/*
+# Upgrade torch to 2.6 to fix torch.load vulnerability requirement
+RUN pip install --no-cache-dir --upgrade torch==2.6.0+cu124 --index-url https://download.pytorch.org/whl/cu124
 
-# Install PyTorch 2.6+ with CUDA 12.4, then other deps
+# Install remaining deps
 RUN pip install --no-cache-dir \
-    torch==2.6.0 --index-url https://download.pytorch.org/whl/cu124 && \
-    pip install --no-cache-dir \
     runpod==1.7.0 \
     sentence-transformers==3.0.1 \
-    huggingface-hub
+    huggingface-hub \
+    safetensors
 
-# Download model files at build time (baked into image)
+# Download model at build time
 RUN python -c "from huggingface_hub import snapshot_download; snapshot_download('BAAI/bge-m3', cache_dir='/app/model_cache')"
 
-# Set HF cache to use our pre-downloaded model
+# Verify model loads
+RUN python -c "import os; os.environ['HF_HOME']='/app/model_cache'; os.environ['TRANSFORMERS_CACHE']='/app/model_cache'; from sentence_transformers import SentenceTransformer; m = SentenceTransformer('BAAI/bge-m3', cache_folder='/app/model_cache'); print('Model OK:', m.encode('test').shape)"
+
 ENV HF_HOME=/app/model_cache
 ENV TRANSFORMERS_CACHE=/app/model_cache
 
-# Copy handler
 COPY handler.py .
 
-# RunPod serverless entry point
 CMD ["python", "-u", "handler.py"]
