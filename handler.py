@@ -12,7 +12,7 @@ from sentence_transformers import SentenceTransformer
 # Load model at container startup (cached in GPU memory)
 print("Loading BAAI/bge-m3 model...")
 device = "cuda" if torch.cuda.is_available() else "cpu"
-model = SentenceTransformer("BAAI/bge-m3", device=device, cache_folder="/app/model_cache")
+model = SentenceTransformer("BAAI/bge-m3", device=device, cache_folder="/app/model_cache", trust_remote_code=True)
 print(f"Model loaded on {device}")
 
 
